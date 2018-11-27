@@ -1,5 +1,6 @@
 const axios = require('axios');
 const Deputado = use('App/Models/Deputado')
+const Despesa = use('App/Models/Despesa')
 
 module.exports = {
   async atualizarDados(){
@@ -7,8 +8,10 @@ module.exports = {
 
     const deputados = await Deputado.all()
 
+    // this.atualizarDespesas(178957, `https://dadosabertos.camara.leg.br/api/v2/deputados/178957/despesas?itens=100&ordem=ASC&ordenarPor=ano`);
+
     deputados.rows.forEach(deputado => {
-      this.atualizarDespesas(`https://dadosabertos.camara.leg.br/api/v2/deputados/${deputado.deputadoId}/despesas?itens=100&ordem=ASC&ordenarPor=ano`);
+      this.atualizarDespesas(deputado.deputadoId, `https://dadosabertos.camara.leg.br/api/v2/deputados/${deputado.deputadoId}/despesas?itens=100&ordem=ASC&ordenarPor=ano`);
     });
   },
   async atualizarDeputados(uri){
@@ -73,18 +76,57 @@ module.exports = {
     }
     return retorno
   },
-  async atualizarDespesas(uri){
+  async atualizarDespesas(deputadoId, uri){
     await axios.get(uri).then(async (response) => {
       let dadosDespesa = response.data.dados;
-      console.log(dadosDespesa);
+      for (let i = 0; i < dadosDespesa.length; i++) {
+        await this.atualizarDespesa(deputadoId, dadosDespesa[i]);
+      }
        
       for (let j = 0; j < response.data.links.length; j++) {
-        if (response.data.links[j].rel === "next")
-          await this.atualizarDespesas(response.data.links[j].href);
+        if (response.data.links[j].rel === "next" && response.data.links[j].href != undefined)
+          await this.atualizarDespesas(deputadoId, response.data.links[j].href);
       }
     })
     .catch((error) => {
       console.log(error);
     })  
+  },
+  async atualizarDespesa(deputadoId, despesa){
+    const despesa_banco = await Despesa.query().where('idDocumento', despesa.idDocumento).where('deputadoId', deputadoId).fetch();
+
+    try {
+      if (despesa_banco.rows.length > 0){
+        var despesaAtualizar = await Despesa.find(despesa_banco.rows[0].id);
+      }
+      else {
+        var despesaAtualizar = new Despesa();
+      }
+        
+      despesaAtualizar.deputadoId = deputadoId;
+      despesaAtualizar.ano = despesa.ano;
+      despesaAtualizar.mes = despesa.mes;
+      despesaAtualizar.tipoDespesa = despesa.tipoDespesa;
+      despesaAtualizar.idDocumento = despesa.idDocumento;
+      despesaAtualizar.tipoDocumento = despesa.tipoDocumento;
+      despesaAtualizar.idTipoDocumento = despesa.idTipoDocumento;
+      despesaAtualizar.dataDocumento = despesa.dataDocumento;
+      despesaAtualizar.numDocumento = despesa.numDocumento;
+      despesaAtualizar.valorDocumento = despesa.valorDocumento;
+      despesaAtualizar.urlDocumento = despesa.urlDocumento;
+      despesaAtualizar.nomeFornecedor = despesa.nomeFornecedor;
+      despesaAtualizar.cnpjCpfFornecedor = despesa.cnpjCpfFornecedor;
+      despesaAtualizar.valorLiquido = despesa.valorLiquido;
+      despesaAtualizar.valorGlosa = despesa.valorGlosa;
+      despesaAtualizar.numRessarcimento = despesa.numRessarcimento;
+      despesaAtualizar.idLote = despesa.idLote;
+      despesaAtualizar.parcela = despesa.parcela;
+
+      var retorno = await despesaAtualizar.save()
+    }
+    catch(error){
+      console.log(error)
+    }
+    return retorno
   },
 }

@@ -6,6 +6,7 @@ class DespesaSchema extends Schema {
   up () {
     this.create('despesas', (table) => {
       table.increments()
+      table.integer('deputadoId')
       table.integer('ano').unsigned()
       table.integer('mes').unsigned()
       table.string('tipoDespesa', 255)
