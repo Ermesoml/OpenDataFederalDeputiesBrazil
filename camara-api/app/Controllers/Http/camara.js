@@ -2,38 +2,51 @@ const axios = require('axios');
 const Deputado = use('App/Models/Deputado')
 const Despesa = use('App/Models/Despesa')
 
+axios.defaults.headers['charset'] = 'utf-8';
+
 module.exports = {
+  despesas: [],
+  despesasGravadas: 0,
   async atualizarDados(){
-    await this.atualizarDeputados('https://dadosabertos.camara.leg.br/api/v2/deputados?itens=100&ordem=ASC&ordenarPor=nome');
+    // await this.atualizarDeputados('https://dadosabertos.camara.leg.br/api/v2/deputados?itens=100&ordem=ASC&ordenarPor=nome');
 
     const deputados = await Deputado.all()
 
-    // this.atualizarDespesas(178957, `https://dadosabertos.camara.leg.br/api/v2/deputados/178957/despesas?itens=100&ordem=ASC&ordenarPor=ano`);
-
-    deputados.rows.forEach(deputado => {
-      this.atualizarDespesas(deputado.deputadoId, `https://dadosabertos.camara.leg.br/api/v2/deputados/${deputado.deputadoId}/despesas?itens=100&ordem=ASC&ordenarPor=ano`);
-    });
+    for (let i = 0; i < deputados.rows.length; i++) {
+      console.log('Buscando despesas do deputado: ' + deputados.rows[i].nome)
+      if (i > 10)
+        await this.atualizarDespesas(deputados.rows[i].deputadoId, `https://dadosabertos.camara.leg.br/api/v2/deputados/${deputados.rows[i].deputadoId}/despesas?ano=2018?itens=100&ordem=ASC&ordenarPor=ano`); 
+    }
+    
+    // console.log(`Atualizando despesas no banco. Total: ${this.despesas.length}`)
+    // for (let j = 0; j < this.despesas.length; j++) {
+    //   console.log(`Atualizando despesa: ${j+1} de ${this.despesas.length}`)
+    //   this.atualizarDespesaBanco(this.despesas[j]);
+    // }
+    // console.log('Despesas atualizadas')
   },
   async atualizarDeputados(uri){
-    await axios.get(uri).then(async (response) => {
-        for (let i = 0; i < response.data.dados.length; i++) {
-          let dadosDeputado = await axios.get(response.data.dados[i].uri).then(async (response) => {
-            return response.data.dados;
-          })
-          .catch((error) => {
-            return error;
-          })
-          await this.atualizarDeputado(dadosDeputado); 
-        }
-
-        for (let j = 0; j < response.data.links.length; j++) {
-          if (response.data.links[j].rel === "next")
-            await this.atualizarDeputados(response.data.links[j].href);
-        }
+    let response = await axios.get(uri).then(async (response) => {
+        return response
       })
       .catch((error) => {
         console.log(error);
+      });
+
+    for (let i = 0; i < response.data.dados.length; i++) {
+      let dadosDeputado = await axios.get(response.data.dados[i].uri).then(async (response) => {
+        return response.data.dados;
       })
+      .catch((error) => {
+        return error;
+      })
+      await this.atualizarDeputado(dadosDeputado);
+    }
+
+    for (let j = 0; j < response.data.links.length; j++) {
+      if (response.data.links[j].rel === "next")
+        await this.atualizarDeputados(response.data.links[j].href);
+    }
   },
   async atualizarDeputado(deputado){
     const deputado_banco = await Deputado.query().where('deputadoId', deputado.id).fetch();
@@ -41,9 +54,11 @@ module.exports = {
     try {
       if (deputado_banco.rows.length > 0){
         var deputadoAtualizar = await Deputado.find(deputado_banco.rows[0].id);
+        console.log('Atualizando deputado: ' + deputado.ultimoStatus.nomeEleitoral)
       }
       else {
         var deputadoAtualizar = new Deputado();
+        console.log('Inserindo deputado: ' + deputado.ultimoStatus.nomeEleitoral)
       }
         
       deputadoAtualizar.deputadoId = deputado.id;
@@ -79,9 +94,16 @@ module.exports = {
   async atualizarDespesas(deputadoId, uri){
     await axios.get(uri).then(async (response) => {
       let dadosDespesa = response.data.dados;
-      for (let i = 0; i < dadosDespesa.length; i++) {
-        await this.atualizarDespesa(deputadoId, dadosDespesa[i]);
-      }
+      dadosDespesa.map((despesa) => {
+        despesa.deputadoId = deputadoId
+        this.atualizarDespesaBanco(despesa);
+        this.despesasGravadas++;
+        console.log(this.despesasGravadas);
+      })
+      // this.despesas = [...this.despesas, ...dadosDespesa];
+      // for (let i = 0; i < dadosDespesa.length; i++) {
+      //   this.atualizarDespesa(deputadoId, dadosDespesa[i]);
+      // }
        
       for (let j = 0; j < response.data.links.length; j++) {
         if (response.data.links[j].rel === "next" && response.data.links[j].href != undefined)
@@ -89,13 +111,12 @@ module.exports = {
       }
     })
     .catch((error) => {
-      console.log(error);
+      console.log(error)
     })  
   },
-  async atualizarDespesa(deputadoId, despesa){
-    const despesa_banco = await Despesa.query().where('idDocumento', despesa.idDocumento).where('deputadoId', deputadoId).fetch();
-
+  async atualizarDespesaBanco(despesa){
     try {
+      const despesa_banco = await Despesa.query().where('idDocumento', despesa.idDocumento).where('deputadoId', despesa.deputadoId).fetch();
       if (despesa_banco.rows.length > 0){
         var despesaAtualizar = await Despesa.find(despesa_banco.rows[0].id);
       }
@@ -103,7 +124,7 @@ module.exports = {
         var despesaAtualizar = new Despesa();
       }
         
-      despesaAtualizar.deputadoId = deputadoId;
+      despesaAtualizar.deputadoId = despesa.deputadoId;
       despesaAtualizar.ano = despesa.ano;
       despesaAtualizar.mes = despesa.mes;
       despesaAtualizar.tipoDespesa = despesa.tipoDespesa;
@@ -114,7 +135,8 @@ module.exports = {
       despesaAtualizar.numDocumento = despesa.numDocumento;
       despesaAtualizar.valorDocumento = despesa.valorDocumento;
       despesaAtualizar.urlDocumento = despesa.urlDocumento;
-      despesaAtualizar.nomeFornecedor = despesa.nomeFornecedor;
+
+      // despesaAtualizar.nomeFornecedor = despesa.nomeFornecedor;
       despesaAtualizar.cnpjCpfFornecedor = despesa.cnpjCpfFornecedor;
       despesaAtualizar.valorLiquido = despesa.valorLiquido;
       despesaAtualizar.valorGlosa = despesa.valorGlosa;
@@ -125,7 +147,7 @@ module.exports = {
       var retorno = await despesaAtualizar.save()
     }
     catch(error){
-      console.log(error)
+      console.log('Erro ao gravar despesa ' +  error)
     }
     return retorno
   },

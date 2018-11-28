@@ -7,7 +7,7 @@ class DeputadoSchema extends Schema {
     this.create('deputados', (table) => {
       table.increments()
       table.integer('deputadoId').unsigned()
-      table.string('uri', 255).unsigned()
+      table.string('uri', 255).notNullable()
       table.string('nome', 255).notNullable()
       table.string('nomeCivil', 255).notNullable()
 
