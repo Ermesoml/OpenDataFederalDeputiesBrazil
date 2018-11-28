@@ -21,3 +21,4 @@ Route.get('/', () => {
 })
 
 Route.get('/deputados', 'DeputadoController.getListaDeputados')
+Route.get('/despesas/:deputadoId', 'DespesaController.getListaDespesas')

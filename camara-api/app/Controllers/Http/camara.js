@@ -8,22 +8,14 @@ module.exports = {
   despesas: [],
   despesasGravadas: 0,
   async atualizarDados(){
-    // await this.atualizarDeputados('https://dadosabertos.camara.leg.br/api/v2/deputados?itens=100&ordem=ASC&ordenarPor=nome');
+    await this.atualizarDeputados('https://dadosabertos.camara.leg.br/api/v2/deputados?itens=100&ordem=ASC&ordenarPor=nome');
 
     const deputados = await Deputado.all()
 
     for (let i = 0; i < deputados.rows.length; i++) {
-      console.log('Buscando despesas do deputado: ' + deputados.rows[i].nome)
-      if (i > 10)
-        await this.atualizarDespesas(deputados.rows[i].deputadoId, `https://dadosabertos.camara.leg.br/api/v2/deputados/${deputados.rows[i].deputadoId}/despesas?ano=2018?itens=100&ordem=ASC&ordenarPor=ano`); 
+      console.log(`Buscando despesas do deputado: ${i+1} - ${deputados.rows[i].nome}`)
+      await this.atualizarDespesas(deputados.rows[i].deputadoId, `https://dadosabertos.camara.leg.br/api/v2/deputados/${deputados.rows[i].deputadoId}/despesas?ano=2018&itens=100&ordem=ASC&ordenarPor=ano`); 
     }
-    
-    // console.log(`Atualizando despesas no banco. Total: ${this.despesas.length}`)
-    // for (let j = 0; j < this.despesas.length; j++) {
-    //   console.log(`Atualizando despesa: ${j+1} de ${this.despesas.length}`)
-    //   this.atualizarDespesaBanco(this.despesas[j]);
-    // }
-    // console.log('Despesas atualizadas')
   },
   async atualizarDeputados(uri){
     let response = await axios.get(uri).then(async (response) => {
@@ -98,7 +90,7 @@ module.exports = {
         despesa.deputadoId = deputadoId
         this.atualizarDespesaBanco(despesa);
         this.despesasGravadas++;
-        console.log(this.despesasGravadas);
+        // console.log(this.despesasGravadas);
       })
       // this.despesas = [...this.despesas, ...dadosDespesa];
       // for (let i = 0; i < dadosDespesa.length; i++) {

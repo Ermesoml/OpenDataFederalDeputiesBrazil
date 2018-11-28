@@ -5,7 +5,7 @@ const camara = use('./camara.js')
 
 class DeputadoController {
   async getListaDeputados({}){
-    camara.atualizarDados();
+    // camara.atualizarDados();
 
     const deputados = await Deputado.all()
     return deputados
